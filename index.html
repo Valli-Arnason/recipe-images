@@ -361,8 +361,9 @@
     }
 
     function enableCreateUI() {
-      createBtn.disabled = false;
-      resetBtn.disabled = false;
+      createBtn.disabled = false; createBtn.removeAttribute('disabled');
+      resetBtn.disabled = false;  resetBtn.removeAttribute('disabled');
+      statusEl.textContent = 'Ready. Click “Create new versions”.';
     }
 
     function updateFileMeta(file) {
@@ -415,7 +416,8 @@
     async function handleFile(file) {
       setError('');
       clearOutputs();
-      if (!file.type.startsWith('image/')) {
+      // Allow files with missing/unknown MIME (some browsers on certain images return empty type)
+      if (file.type && !file.type.startsWith('image/')) {
         setError('Please choose an image file (PNG, JPEG, or WebP).');
         return;
       }
