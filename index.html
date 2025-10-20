@@ -60,7 +60,7 @@
       text-align: center;
     }
     .dropzone.dragover { border-color: var(--accent); background: #101523; }
-    .dropzone input { display: none; }
+    .dropzone input { display: inline-block; }
     .dz-title { font-weight: 600; }
     .dz-hint { color: var(--muted); font-size: 13px; }
 
@@ -127,6 +127,8 @@
     .bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #09a1ff); transition: width .25s ease; }
 
     a.download-link { text-decoration: none; }
+  .file-btn {background: var(--accent); color:#fff; font-weight:600; padding:10px 14px; border-radius:10px; border:none; cursor:pointer;}
+    .file-btn::-webkit-file-upload-button {background: rgba(255,255,255,.12); border:none; padding:8px 10px; border-radius:8px; color:#fff; cursor:pointer;}
   </style>
 </head>
 <body>
@@ -135,13 +137,13 @@
     <p class="sub">Upload a single landscape recipe image (PNG, JPG/JPEG, or WebP). Convert to JPG and create two widths: <strong>1600px</strong> (desktop) and <strong>700px</strong> (app). Everything runs in your browser; no uploads to a server.</p>
 
     <section class="upload panel" aria-label="Upload image">
-      <label id="dropzone" class="dropzone" for="file" tabindex="0" role="button" aria-controls="file" aria-describedby="dropHelp">
-        <input id="file" type="file" accept="image/*" aria-label="Choose image" />
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-describedby="dropHelp">
         <div>
           <div class="dz-title">Click to choose an image</div>
           <div class="dz-hint" id="dropHelp">…or drag & drop it here</div>
+          <div style="margin-top:12px"><input id="file" type="file" class="file-btn" accept="image/*" aria-label="Choose image" /></div>
         </div>
-      </label>
+      </div>
       <div id="fileMeta" class="helper hide"></div>
     </section>
 
@@ -374,13 +376,15 @@
     }
 
     // --- Event handlers ---
+    // Prevent the browser from navigating away on drag-drop outside the dropzone
+    ['dragover','drop'].forEach(evt => window.addEventListener(evt, e => { e.preventDefault(); }));
+
     dropzone.addEventListener('click', () => {
-      try { fileInput.click(); }
-      catch (e) {
-        // Fallback: temporarily reveal the native input if programmatic click is blocked
-        fileInput.style.display = 'block';
-        fileInput.focus();
-      }
+      // Prefer the native file input
+      try { fileInput?.click(); } catch {}
+    });
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput?.click(); }
     });
 
     ['dragenter', 'dragover'].forEach(evt => dropzone.addEventListener(evt, (e) => {
@@ -405,6 +409,7 @@
     fileInput.addEventListener('change', () => {
       const f = fileInput.files && fileInput.files[0];
       if (f) { handleFile(f); }
+    }); }
     });
 
     async function handleFile(file) {
