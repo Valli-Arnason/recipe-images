@@ -380,10 +380,14 @@
     // Prevent the browser from navigating away on drag-drop outside the dropzone
     ['dragover','drop'].forEach(evt => window.addEventListener(evt, e => { e.preventDefault(); }));
 
-    dropzone.addEventListener('click', () => {
-      // Prefer the native file input
-      try { fileInput?.click(); } catch {}
-    });
+dropzone.addEventListener('click', () => {
+  try {
+    if (fileInput) fileInput.click();
+  } catch (e) {
+    console.warn('File click fallback', e);
+  }
+});
+
     dropzone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput?.click(); }
     });
@@ -499,3 +503,4 @@
   </script>
 </body>
 </html>
+
