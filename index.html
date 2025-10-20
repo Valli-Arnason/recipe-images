@@ -135,11 +135,11 @@
     <p class="sub">Upload a single landscape recipe image (PNG, JPG/JPEG, or WebP). Convert to JPG and create two widths: <strong>1600px</strong> (desktop) and <strong>700px</strong> (app). Everything runs in your browser; no uploads to a server.</p>
 
     <section class="upload panel" aria-label="Upload image">
-      <label id="dropzone" class="dropzone" for="file">
-        <input id="file" type="file" accept="image/png, image/jpeg, image/webp, image/jpg" aria-label="Choose image" />
+      <label id="dropzone" class="dropzone" for="file" tabindex="0" role="button" aria-controls="file" aria-describedby="dropHelp">
+        <input id="file" type="file" accept="image/*" aria-label="Choose image" />
         <div>
           <div class="dz-title">Click to choose an image</div>
-          <div class="dz-hint">…or drag & drop it here</div>
+          <div class="dz-hint" id="dropHelp">…or drag & drop it here</div>
         </div>
       </label>
       <div id="fileMeta" class="helper hide"></div>
@@ -374,7 +374,14 @@
     }
 
     // --- Event handlers ---
-    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('click', () => {
+      try { fileInput.click(); }
+      catch (e) {
+        // Fallback: temporarily reveal the native input if programmatic click is blocked
+        fileInput.style.display = 'block';
+        fileInput.focus();
+      }
+    });
 
     ['dragenter', 'dragover'].forEach(evt => dropzone.addEventListener(evt, (e) => {
       e.preventDefault(); e.stopPropagation(); dropzone.classList.add('dragover');
@@ -383,7 +390,15 @@
       e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('dragover');
     }));
     dropzone.addEventListener('drop', (e) => {
-      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      const dt = e.dataTransfer;
+      let f = null;
+      if (dt?.items && dt.items.length) {
+        for (const item of dt.items) {
+          if (item.kind === 'file') { f = item.getAsFile(); break; }
+        }
+      } else if (dt?.files && dt.files.length) {
+        f = dt.files[0];
+      }
       if (f) { handleFile(f); }
     });
 
