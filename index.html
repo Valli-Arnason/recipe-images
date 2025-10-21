@@ -320,7 +320,7 @@
       return canvas;
     }
 
-    async function bytesToKB(bytes){ return Math.round(bytes / 1024); }
+    function bytesToKB(bytes){ return Math.round(bytes / 1024); }
 
     async function canvasToJpegBlob(canvas, quality = 0.85) {
       if (canvas.convertToBlob) {
@@ -344,7 +344,7 @@
       return { blob, quality: chosen, targetKB };
     }
 
-    async function generateVersion(src, targetWidth, optimize = true) {(src, targetWidth) {
+    async function generateVersion(src, targetWidth, optimize = true) {
       const scale = targetWidth / src.width;
       const targetHeight = Math.max(1, Math.round(src.height * scale));
       const canvas = drawToCanvas(src, targetWidth, targetHeight);
@@ -397,18 +397,18 @@
     dropzone.addEventListener('drop', (e) => {
       const dt = e.dataTransfer;
       let f = null;
-      if (dt?.items && dt.items.length) {
+      if (dt && dt.items && dt.items.length) {
         for (const item of dt.items) {
           if (item.kind === 'file') { f = item.getAsFile(); break; }
         }
-      } else if (dt?.files && dt.files.length) {
+      } else if (dt && dt.files && dt.files.length) {
         f = dt.files[0];
       }
       if (f) { handleFile(f); }
     });
 
-    fileInput.addEventListener('change', () => {
-      const f = fileInput.files && fileInput.files[0];
+    fileInput.addEventListener('change', function(){
+      const f = fileInput && fileInput.files && fileInput.files[0];
       if (f) { handleFile(f); }
     }); }
     });
@@ -453,8 +453,14 @@
         const name1600 = `${base}-desktop-1600.jpg`;
         const name700 = `${base}-app-700.jpg`;
 
-        img1600.src = v1600.url; meta1600.textContent = `${v1600.width} × ${v1600.height}px · JPG · ${bytesToKB(v1600.blob.size)} KB · q=${v1600.quality?.toFixed(2) ?? '0.90'}`;
-        img700.src = v700.url;   meta700.textContent = `${v700.width} × ${v700.height}px · JPG · ${bytesToKB(v700.blob.size)} KB · q=${v700.quality?.toFixed(2) ?? '0.90'}`;
+        img1600.src = v1600.url; {
+          var q1600 = (v1600.quality && v1600.quality.toFixed) ? v1600.quality.toFixed(2) : '0.90';
+          meta1600.textContent = v1600.width + ' × ' + v1600.height + 'px · JPG · ' + bytesToKB(v1600.blob.size) + ' KB · q=' + q1600;
+        }
+        img700.src = v700.url; {
+          var q700 = (v700.quality && v700.quality.toFixed) ? v700.quality.toFixed(2) : '0.90';
+          meta700.textContent = v700.width + ' × ' + v700.height + 'px · JPG · ' + bytesToKB(v700.blob.size) + ' KB · q=' + q700;
+        }
 
         dl1600.href = v1600.url; dl1600.download = name1600;
         dl700.href = v700.url;   dl700.download = name700;
