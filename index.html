@@ -197,8 +197,6 @@
         <p class="footer">Filenames are based on your original, with <code>-desktop-1600.jpg</code> and <code>-app-700.jpg</code> suffixes.</p>
       </div>
     </section>
-
-    <p class="footer">Tip: Host this single file as <code>index.html</code> on GitHub Pages and share the link with your team.</p>
   </div>
 
   <script>
@@ -272,6 +270,7 @@
       if (file.type === 'image/jpeg') return 'JPEG';
       if (file.type === 'image/png') return 'PNG';
       if (file.type === 'image/webp') return 'WebP';
+      if (file.type === 'image/avif') return 'avif';
       return file.type;
     }
 
@@ -419,7 +418,7 @@
       clearOutputs();
       // Allow files with missing/unknown MIME (some browsers on certain images return empty type)
       if (file.type && !file.type.startsWith('image/')) {
-        setError('Please choose an image file (PNG, JPEG, or WebP).');
+        setError('Please choose an image file (PNG, JPEG, AVIF or WebP).');
         return;
       }
       currentFile = file;
