@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brilliant Image Resizer</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #13151a;
+      --muted: #9aa4b2;
+      --text: #e8eef7;
+      --accent: #4f46e5;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+      --border: #242834;
+      --shadow: 0 10px 25px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 800px at 10% -10%, #151a23, var(--bg));
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: grid;
+      place-items: start center;
+      padding: 32px 16px 64px;
+    }
+    .app {
+      width: 100%;
+      max-width: 980px;
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+    .sub { color: var(--muted); margin-bottom: 24px; }
+
+    .upload {
+      display: grid;
+      gap: 16px;
+    }
+
+    .dropzone {
+      border: 2px dashed #2b3240;
+      border-radius: var(--radius);
+      padding: 26px;
+      display: grid;
+      place-items: center;
+      background: #0f1217;
+      transition: border-color .2s ease, background .2s ease;
+      cursor: pointer;
+      text-align: center;
+    }
+    .dropzone.dragover { border-color: var(--accent); background: #101523; }
+    .dropzone input { display: inline-block; }
+    .dz-title { font-weight: 600; }
+    .dz-hint { color: var(--muted); font-size: 13px; }
+
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+    .btn {
+      appearance: none; border: none; outline: none;
+      background: var(--accent);
+      color: white;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-weight: 600;
+      letter-spacing: .2px;
+      cursor: pointer;
+      transition: transform .06s ease, opacity .2s ease, background .2s ease;
+    }
+    .btn[disabled] { opacity: .5; cursor: not-allowed; }
+    .btn:active { transform: translateY(1px); }
+    .btn.secondary { background: #263046; color: #dbe4f3; }
+    .btn.success { background: var(--accent-2); }
+    .btn.text { background: transparent; color: var(--muted); }
+
+    .helper { color: var(--muted); font-size: 14px; }
+    .helper strong { color: #e6eaf2; }
+
+    .panels { display: grid; gap: 16px; margin-top: 16px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .preview-wrap { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 780px) {
+      .preview-wrap { grid-template-columns: 1fr 1fr; }
+    }
+
+    .card {
+      background: #0f131a;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .card h3 { margin: 0; font-size: 16px; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .thumb {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: contain;
+      background: #0c0f14;
+      border-radius: 10px;
+      border: 1px solid #1e2330;
+    }
+
+    .footer { color: var(--muted); font-size: 13px; margin-top: 18px; }
+    .error { color: var(--danger); font-weight: 600; }
+    .spacer { height: 8px; }
+    .hide { display: none !important; }
+
+    .progress { height: 4px; width: 100%; background: #0e1117; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #09a1ff); transition: width .25s ease; }
+
+    a.download-link { text-decoration: none; }
+  .file-btn {background: var(--accent); color:#fff; font-weight:600; padding:10px 14px; border-radius:10px; border:none; cursor:pointer;}
+    .file-btn::-webkit-file-upload-button {background: rgba(255,255,255,.12); border:none; padding:8px 10px; border-radius:8px; color:#fff; cursor:pointer;}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Brilliant Image Resizer">
+    <h1>Brilliant Image Resizer</h1>
+    <p class="sub">Upload a single landscape image (PNG, JPG/JPEG, or WebP). Convert to JPG and create two widths: <strong>1600px</strong> (desktop) and <strong>700px</strong> (app). Everything runs in your browser; no uploads to a server.</p>
+
+    <section class="upload panel" aria-label="Upload image">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-describedby="dropHelp">
+        <div>
+          <div class="dz-title">Click to choose an image</div>
+          <div class="dz-hint" id="dropHelp">…or drag & drop it here</div>
+          <div style="margin-top:12px"><input id="file" type="file" class="file-btn" accept="image/*" aria-label="Choose image" /></div>
+        </div>
+      </div>
+      <div id="fileMeta" class="helper hide"></div>
+    </section>
+
+    <div class="spacer"></div>
+
+    <section class="panel" aria-live="polite">
+      <p id="instruction" class="helper">Create a desktop (<strong>1600px</strong> width) and app (<strong>700px</strong> width) version.</p>
+      <div class="row">
+        <button id="createBtn" class="btn" disabled>Create new versions</button>
+        <button id="resetBtn" class="btn secondary" disabled>Reset</button>
+      </div>
+      <div class="row" style="gap:8px;margin-top:6px">
+        <label class="helper" style="display:flex;align-items:center;gap:8px">
+          <input id="optimize" type="checkbox" checked /> Optimize file size (adaptive quality)
+        </label>
+        <span class="helper" id="optimizeHint">Targets: ~500 KB (1600px), ~180 KB (700px)</span>
+      </div>
+      <div class="spacer"></div>
+      <div id="progress" class="progress hide" aria-hidden="true"><div class="bar" id="bar"></div></div>
+      <div id="status" class="helper" role="status"></div>
+      <div id="error" class="error" role="alert"></div>
+    </section>
+
+    <section id="results" class="panels hide">
+      <div class="panel">
+        <h2 style="margin:0 0 8px;font-size:18px">Outputs</h2>
+        <div class="preview-wrap"></div>
+        <div class="spacer"></div>
+        <div class="row">
+          <button id="dlBoth" class="btn success" disabled>Download both</button>
+          <button id="startOver" class="btn text">Start over</button>
+        </div>
+        <p class="footer">Filenames are based on your original, with <code>-desktop-1600.jpg</code> and <code>-app-700.jpg</code> suffixes.</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const MAX_FILES = 10;
+    const TARGETS = [
+      { width: 1600, suffix: 'desktop-1600', targetKB: 500 },
+      { width: 700, suffix: 'app-700', targetKB: 180 }
+    ];
+
+    const fileInput = document.getElementById('file');
+    const dropzone = document.getElementById('dropzone');
+    const fileMeta = document.getElementById('fileMeta');
+    const createBtn = document.getElementById('createBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const progress = document.getElementById('progress');
+    const bar = document.getElementById('bar');
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+    const optimizeChk = document.getElementById('optimize');
+    const results = document.getElementById('results');
+    const resultGrid = results.querySelector('.preview-wrap');
+    const resultTitle = results.querySelector('h2');
+    const dlBoth = document.getElementById('dlBoth');
+    const startOver = document.getElementById('startOver');
+
+    let selectedFiles = [];
+    let processedItems = [];
+
+    fileInput.multiple = true;
+    fileInput.setAttribute('accept', 'image/png,image/jpeg,image/webp,image/avif');
+
+    document.querySelector('.sub').innerHTML =
+      'Upload up to <strong>multiple landscape images</strong> (PNG, JPG/JPEG, WebP or AVIF). Create JPG versions at <strong>1600px</strong> and <strong>700px</strong>. Everything runs in your browser; no uploads to a server.';
+    document.querySelector('.dz-title').textContent = 'Click to choose images';
+    document.getElementById('dropHelp').textContent = '…or drag & drop up to 10 images here';
+    document.getElementById('instruction').innerHTML =
+      'Create desktop (<strong>1600px</strong>) and app (<strong>700px</strong>) versions for every selected image.';
+    createBtn.textContent = 'Create all versions';
+    dlBoth.textContent = 'Download all as ZIP';
+    resultTitle.textContent = 'Outputs';
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const fmt = (n) => n.toLocaleString();
+    const bytesToKB = (bytes) => Math.round(bytes / 1024);
+
+    function baseNameNoExt(filename) {
+      const i = filename.lastIndexOf('.');
+      return i === -1 ? filename : filename.slice(0, i);
+    }
+
+    function safeBaseName(filename) {
+      return (baseNameNoExt(filename) || 'image')
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function setProgress(value) {
+      bar.style.width = `${Math.max(0, Math.min(100, Math.round(value)))}%`;
+    }
+
+    function show(el) { el.classList.remove('hide'); }
+    function hide(el) { el.classList.add('hide'); }
+    function setError(message) { errorEl.textContent = message; }
+
+    function readableMime(file) {
+      const types = {
+        'image/jpeg': 'JPEG',
+        'image/png': 'PNG',
+        'image/webp': 'WebP',
+        'image/avif': 'AVIF'
+      };
+      return types[file.type] || file.type || 'Unknown';
+    }
+
+    function revokeProcessedUrls() {
+      for (const item of processedItems) {
+        for (const output of item.outputs) {
+          if (output.url) URL.revokeObjectURL(output.url);
+        }
+      }
+      processedItems = [];
+    }
+
+    function clearResults() {
+      revokeProcessedUrls();
+      resultGrid.innerHTML = '';
+      dlBoth.disabled = true;
+      hide(results);
+    }
+
+    function resetAll() {
+      selectedFiles = [];
+      fileInput.value = '';
+      fileMeta.textContent = '';
+      hide(fileMeta);
+      createBtn.disabled = true;
+      resetBtn.disabled = true;
+      statusEl.textContent = '';
+      setError('');
+      setProgress(0);
+      hide(progress);
+      clearResults();
+    }
+
+    function validateFiles(files) {
+      const imageFiles = files.filter(file => !file.type || file.type.startsWith('image/'));
+      const rejectedCount = files.length - imageFiles.length;
+      const limited = imageFiles.slice(0, MAX_FILES);
+
+      if (rejectedCount > 0) {
+        setError(`${rejectedCount} non-image file${rejectedCount === 1 ? '' : 's'} ignored.`);
+      } else if (imageFiles.length > MAX_FILES) {
+        setError(`Only the first ${MAX_FILES} images were selected.`);
+      } else {
+        setError('');
+      }
+      return limited;
+    }
+
+    function updateFileMeta() {
+      if (!selectedFiles.length) {
+        hide(fileMeta);
+        return;
+      }
+
+      const totalKB = selectedFiles.reduce((sum, file) => sum + file.size, 0) / 1024;
+      const names = selectedFiles.map(file => file.name).join(', ');
+      fileMeta.innerHTML = `<strong>Selected:</strong> ${selectedFiles.length} image${selectedFiles.length === 1 ? '' : 's'} · ${fmt(Math.round(totalKB))} KB total<br><span title="${names.replace(/"/g, '&quot;')}">${names}</span>`;
+      show(fileMeta);
+      createBtn.disabled = false;
+      resetBtn.disabled = false;
+      statusEl.textContent = `Ready to process ${selectedFiles.length} image${selectedFiles.length === 1 ? '' : 's'}.`;
+    }
+
+    function handleFiles(fileList) {
+      clearResults();
+      const files = validateFiles(Array.from(fileList || []));
+      if (!files.length) {
+        selectedFiles = [];
+        updateFileMeta();
+        createBtn.disabled = true;
+        resetBtn.disabled = true;
+        if (!errorEl.textContent) setError('Please choose one or more image files.');
+        return;
+      }
+      selectedFiles = files;
+      updateFileMeta();
+    }
+
+    async function decodeImageWithOrientation(file) {
+      try {
+        if ('createImageBitmap' in window) {
+          const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+          return {
+            bmp: bitmap,
+            width: bitmap.width,
+            height: bitmap.height,
+            release: () => bitmap.close && bitmap.close()
+          };
+        }
+      } catch (_) {}
+
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const element = new Image();
+          element.onload = () => resolve(element);
+          element.onerror = reject;
+          element.src = url;
+        });
+        return { img, width: img.naturalWidth, height: img.naturalHeight, cleanupUrl: url };
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        throw error;
+      }
+    }
+
+    function drawToCanvas(src, targetWidth, targetHeight) {
+      const canvas = ('OffscreenCanvas' in window)
+        ? new OffscreenCanvas(targetWidth, targetHeight)
+        : document.createElement('canvas');
+
+      if (!(canvas instanceof OffscreenCanvas)) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(src.bmp || src.img, 0, 0, targetWidth, targetHeight);
+      return canvas;
+    }
+
+    async function canvasToJpegBlob(canvas, quality = 0.85) {
+      if (canvas.convertToBlob) {
+        return canvas.convertToBlob({ type: 'image/jpeg', quality });
+      }
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create JPG.')), 'image/jpeg', quality);
+      });
+    }
+
+    async function jpegWithAdaptiveQuality(canvas, targetKB) {
+      const qualities = [0.82, 0.74, 0.68, 0.62, 0.58];
+      let blob = null;
+      let quality = qualities[0];
+      for (const candidate of qualities) {
+        quality = candidate;
+        blob = await canvasToJpegBlob(canvas, quality);
+        if (bytesToKB(blob.size) <= targetKB) break;
+      }
+      return { blob, quality };
+    }
+
+    async function generateVersion(src, target, optimize) {
+      const scale = target.width / src.width;
+      const targetHeight = Math.max(1, Math.round(src.height * scale));
+      const canvas = drawToCanvas(src, target.width, targetHeight);
+
+      let blob;
+      let quality = 0.9;
+      if (optimize) {
+        const adaptive = await jpegWithAdaptiveQuality(canvas, target.targetKB);
+        blob = adaptive.blob;
+        quality = adaptive.quality;
+      } else {
+        blob = await canvasToJpegBlob(canvas, quality);
+      }
+
+      return {
+        blob,
+        url: URL.createObjectURL(blob),
+        width: target.width,
+        height: targetHeight,
+        quality,
+        suffix: target.suffix
+      };
+    }
+
+    function addResultCard(file, output) {
+      const base = safeBaseName(file.name);
+      const filename = `${base}-${output.suffix}.jpg`;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h3>${file.name} · ${output.width}px</h3>
+        <img class="thumb" alt="Preview of ${filename}">
+        <div class="meta">${output.width} × ${output.height}px · JPG · ${bytesToKB(output.blob.size)} KB · q=${output.quality.toFixed(2)}</div>
+        <div class="row"><a class="btn download-link" download="${filename}">Download JPG</a></div>
+      `;
+      const img = card.querySelector('img');
+      const link = card.querySelector('a');
+      img.src = output.url;
+      link.href = output.url;
+      resultGrid.appendChild(card);
+    }
+
+    ['dragover', 'drop'].forEach(eventName => {
+      window.addEventListener(eventName, event => event.preventDefault());
+    });
+
+    dropzone.addEventListener('click', event => {
+      if (event.target !== fileInput) fileInput.click();
+    });
+
+    dropzone.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, event => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, event => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', event => handleFiles(event.dataTransfer.files));
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    createBtn.addEventListener('click', async () => {
+      if (!selectedFiles.length) return;
+
+      clearResults();
+      createBtn.disabled = true;
+      resetBtn.disabled = true;
+      show(progress);
+      setError('');
+      setProgress(0);
+
+      const totalSteps = selectedFiles.length * TARGETS.length;
+      let completedSteps = 0;
+      let failureCount = 0;
+
+      try {
+        for (let fileIndex = 0; fileIndex < selectedFiles.length; fileIndex++) {
+          const file = selectedFiles[fileIndex];
+          statusEl.textContent = `Decoding ${fileIndex + 1} of ${selectedFiles.length}: ${file.name}`;
+          const src = await decodeImageWithOrientation(file);
+          const item = { file, outputs: [] };
+
+          try {
+            for (const target of TARGETS) {
+              statusEl.textContent = `Processing ${fileIndex + 1} of ${selectedFiles.length}: ${file.name} → ${target.width}px`;
+              const output = await generateVersion(src, target, optimizeChk.checked);
+              item.outputs.push(output);
+              addResultCard(file, output);
+              completedSteps++;
+              setProgress((completedSteps / totalSteps) * 100);
+              await sleep(20);
+            }
+            processedItems.push(item);
+          } finally {
+            if (src.cleanupUrl) URL.revokeObjectURL(src.cleanupUrl);
+            if (src.release) src.release();
+          }
+        }
+
+        show(results);
+        dlBoth.disabled = processedItems.length === 0;
+        statusEl.textContent = `Done. Created ${completedSteps} JPG files from ${processedItems.length} image${processedItems.length === 1 ? '' : 's'}.`;
+      } catch (error) {
+        console.error(error);
+        failureCount++;
+        show(results);
+        dlBoth.disabled = processedItems.length === 0;
+        setError('Processing stopped because one image could not be decoded. Try removing that image and run again.');
+        statusEl.textContent = processedItems.length ? `Created files for ${processedItems.length} image${processedItems.length === 1 ? '' : 's'} before the error.` : '';
+      } finally {
+        if (!failureCount) setProgress(100);
+        createBtn.disabled = false;
+        resetBtn.disabled = false;
+        setTimeout(() => hide(progress), 250);
+      }
+    });
+
+    dlBoth.addEventListener('click', async () => {
+      if (!processedItems.length) return;
+      if (typeof JSZip === 'undefined') {
+        setError('ZIP library did not load. Check your internet connection and refresh the page.');
+        return;
+      }
+
+      dlBoth.disabled = true;
+      statusEl.textContent = 'Creating ZIP file…';
+      setError('');
+
+      try {
+        const zip = new JSZip();
+        for (const item of processedItems) {
+          const base = safeBaseName(item.file.name);
+          for (const output of item.outputs) {
+            zip.file(`${base}-${output.suffix}.jpg`, output.blob);
+          }
+        }
+
+        const zipBlob = await zip.generateAsync(
+          { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
+          metadata => statusEl.textContent = `Creating ZIP file… ${Math.round(metadata.percent)}%`
+        );
+
+        const url = URL.createObjectURL(zipBlob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `recipe-images-${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        statusEl.textContent = `ZIP downloaded with ${processedItems.length * TARGETS.length} JPG files.`;
+      } catch (error) {
+        console.error(error);
+        setError('Could not create the ZIP file. Individual downloads are still available below.');
+      } finally {
+        dlBoth.disabled = false;
+      }
+    });
+
+    resetBtn.addEventListener('click', resetAll);
+    startOver.addEventListener('click', resetAll);
+    resetAll();
+  </script>
+</body>
+</html>
