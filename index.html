@@ -151,9 +151,17 @@
     <div class="spacer"></div>
 
     <section class="panel" aria-live="polite">
-      <p id="instruction" class="helper">Create a desktop (<strong>1600px</strong> width) and app (<strong>700px</strong> width) version.</p>
+      <p id="instruction" class="helper">Choose which JPG versions to create.</p>
+      <div class="row" style="gap:18px;margin-bottom:10px">
+        <label class="helper" style="display:flex;align-items:center;gap:8px">
+          <input id="size1600" type="checkbox" checked /> Desktop · <strong>1600px</strong>
+        </label>
+        <label class="helper" style="display:flex;align-items:center;gap:8px">
+          <input id="size700" type="checkbox" checked /> App · <strong>700px</strong>
+        </label>
+      </div>
       <div class="row">
-        <button id="createBtn" class="btn" disabled>Create new versions</button>
+        <button id="createBtn" class="btn" disabled>Create selected versions</button>
         <button id="resetBtn" class="btn secondary" disabled>Reset</button>
       </div>
       <div class="row" style="gap:8px;margin-top:6px">
@@ -199,6 +207,8 @@
     const statusEl = document.getElementById('status');
     const errorEl = document.getElementById('error');
     const optimizeChk = document.getElementById('optimize');
+    const size1600Chk = document.getElementById('size1600');
+    const size700Chk = document.getElementById('size700');
     const results = document.getElementById('results');
     const resultGrid = results.querySelector('.preview-wrap');
     const resultTitle = results.querySelector('h2');
@@ -216,8 +226,8 @@
     document.querySelector('.dz-title').textContent = 'Click to choose images';
     document.getElementById('dropHelp').textContent = '…or drag & drop up to 10 images here';
     document.getElementById('instruction').innerHTML =
-      'Create desktop (<strong>1600px</strong>) and app (<strong>700px</strong>) versions for every selected image.';
-    createBtn.textContent = 'Create all versions';
+      'Choose one or both output sizes. Both are selected by default.';
+    createBtn.textContent = 'Create selected versions';
     dlBoth.textContent = 'Download all as ZIP';
     resultTitle.textContent = 'Outputs';
 
@@ -244,6 +254,39 @@
     function show(el) { el.classList.remove('hide'); }
     function hide(el) { el.classList.add('hide'); }
     function setError(message) { errorEl.textContent = message; }
+
+
+    function getSelectedTargets() {
+      return TARGETS.filter(target =>
+        (target.width === 1600 && size1600Chk.checked) ||
+        (target.width === 700 && size700Chk.checked)
+      );
+    }
+
+    function updateSizeSelectionUI() {
+      const selectedTargets = getSelectedTargets();
+      const hasFiles = selectedFiles.length > 0;
+      createBtn.disabled = !hasFiles || selectedTargets.length === 0;
+
+      if (selectedTargets.length === 0) {
+        setError('Select at least one output size: 1600px or 700px.');
+      } else if (errorEl.textContent === 'Select at least one output size: 1600px or 700px.') {
+        setError('');
+      }
+
+      const visibleWidths = new Set(selectedTargets.map(target => String(target.width)));
+      resultGrid.querySelectorAll('[data-output-width]').forEach(card => {
+        card.classList.toggle('hide', !visibleWidths.has(card.dataset.outputWidth));
+      });
+
+      if (processedItems.length) {
+        const visibleCount = processedItems.reduce((total, item) =>
+          total + item.outputs.filter(output => visibleWidths.has(String(output.width))).length, 0
+        );
+        dlBoth.disabled = visibleCount === 0;
+        dlBoth.textContent = visibleCount === 1 ? 'Download selected JPG' : 'Download selected as ZIP';
+      }
+    }
 
     function readableMime(file) {
       const types = {
@@ -274,6 +317,8 @@
     function resetAll() {
       selectedFiles = [];
       fileInput.value = '';
+      size1600Chk.checked = true;
+      size700Chk.checked = true;
       fileMeta.textContent = '';
       hide(fileMeta);
       createBtn.disabled = true;
@@ -310,8 +355,8 @@
       const names = selectedFiles.map(file => file.name).join(', ');
       fileMeta.innerHTML = `<strong>Selected:</strong> ${selectedFiles.length} image${selectedFiles.length === 1 ? '' : 's'} · ${fmt(Math.round(totalKB))} KB total<br><span title="${names.replace(/"/g, '&quot;')}">${names}</span>`;
       show(fileMeta);
-      createBtn.disabled = false;
       resetBtn.disabled = false;
+      updateSizeSelectionUI();
       statusEl.textContent = `Ready to process ${selectedFiles.length} image${selectedFiles.length === 1 ? '' : 's'}.`;
     }
 
@@ -426,6 +471,7 @@
       const filename = `${base}-${output.suffix}.jpg`;
       const card = document.createElement('div');
       card.className = 'card';
+      card.dataset.outputWidth = String(output.width);
       card.innerHTML = `
         <h3>${file.name} · ${output.width}px</h3>
         <img class="thumb" alt="Preview of ${filename}">
@@ -472,9 +518,17 @@
 
     dropzone.addEventListener('drop', event => handleFiles(event.dataTransfer.files));
     fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+    size1600Chk.addEventListener('change', updateSizeSelectionUI);
+    size700Chk.addEventListener('change', updateSizeSelectionUI);
 
     createBtn.addEventListener('click', async () => {
       if (!selectedFiles.length) return;
+
+      const selectedTargets = getSelectedTargets();
+      if (!selectedTargets.length) {
+        updateSizeSelectionUI();
+        return;
+      }
 
       clearResults();
       createBtn.disabled = true;
@@ -483,7 +537,7 @@
       setError('');
       setProgress(0);
 
-      const totalSteps = selectedFiles.length * TARGETS.length;
+      const totalSteps = selectedFiles.length * selectedTargets.length;
       let completedSteps = 0;
       let failureCount = 0;
 
@@ -495,7 +549,7 @@
           const item = { file, outputs: [] };
 
           try {
-            for (const target of TARGETS) {
+            for (const target of selectedTargets) {
               statusEl.textContent = `Processing ${fileIndex + 1} of ${selectedFiles.length}: ${file.name} → ${target.width}px`;
               const output = await generateVersion(src, target, optimizeChk.checked);
               item.outputs.push(output);
@@ -512,13 +566,13 @@
         }
 
         show(results);
-        dlBoth.disabled = processedItems.length === 0;
+        updateSizeSelectionUI();
         statusEl.textContent = `Done. Created ${completedSteps} JPG files from ${processedItems.length} image${processedItems.length === 1 ? '' : 's'}.`;
       } catch (error) {
         console.error(error);
         failureCount++;
         show(results);
-        dlBoth.disabled = processedItems.length === 0;
+        updateSizeSelectionUI();
         setError('Processing stopped because one image could not be decoded. Try removing that image and run again.');
         statusEl.textContent = processedItems.length ? `Created files for ${processedItems.length} image${processedItems.length === 1 ? '' : 's'} before the error.` : '';
       } finally {
@@ -541,12 +595,37 @@
       setError('');
 
       try {
-        const zip = new JSZip();
+        const selectedWidths = new Set(getSelectedTargets().map(target => target.width));
+        const selectedOutputs = [];
         for (const item of processedItems) {
           const base = safeBaseName(item.file.name);
           for (const output of item.outputs) {
-            zip.file(`${base}-${output.suffix}.jpg`, output.blob);
+            if (selectedWidths.has(output.width)) {
+              selectedOutputs.push({ base, output });
+            }
           }
+        }
+
+        if (!selectedOutputs.length) {
+          setError('No processed files match the selected output sizes. Create the selected versions first.');
+          return;
+        }
+
+        if (selectedOutputs.length === 1) {
+          const { base, output } = selectedOutputs[0];
+          const anchor = document.createElement('a');
+          anchor.href = output.url;
+          anchor.download = `${base}-${output.suffix}.jpg`;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          statusEl.textContent = 'JPG downloaded.';
+          return;
+        }
+
+        const zip = new JSZip();
+        for (const { base, output } of selectedOutputs) {
+          zip.file(`${base}-${output.suffix}.jpg`, output.blob);
         }
 
         const zipBlob = await zip.generateAsync(
@@ -562,7 +641,7 @@
         anchor.click();
         anchor.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        statusEl.textContent = `ZIP downloaded with ${processedItems.length * TARGETS.length} JPG files.`;
+        statusEl.textContent = `ZIP downloaded with ${selectedOutputs.length} JPG files.`;
       } catch (error) {
         console.error(error);
         setError('Could not create the ZIP file. Individual downloads are still available below.');
